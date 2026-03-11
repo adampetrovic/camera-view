@@ -1,6 +1,6 @@
 {
-    "name": "Camera View",
-    "short_name": "Cameras",
+    "name": "babycam",
+    "short_name": "babycam",
     "description": "Side-by-side camera viewer with cry detection",
     "start_url": "/",
     "display": "standalone",
@@ -9,9 +9,14 @@
     "theme_color": "#000000",
     "icons": [
         {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📷</text></svg>",
+            "src": "/icons/icon.svg",
             "sizes": "any",
             "type": "image/svg+xml"
+        },
+        {
+            "src": "/icons/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
         }
     ]
 }
