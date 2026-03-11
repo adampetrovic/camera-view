@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cameras">
+    <meta name="theme-color" content="#000000">
+    <title>Camera View</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📷</text></svg>">
+</head>
+<body>
+    <!-- Start overlay — required for AudioContext + autoplay on iPadOS -->
+    <div id="start-overlay">
+        <div class="start-content">
+            <div class="start-icon">📷</div>
+            <div class="start-title">Camera View</div>
+            <button id="start-btn">Tap to Start</button>
+        </div>
+    </div>
+
+    <!-- Main app -->
+    <div id="app" class="hidden">
+        <!-- Stream containers -->
+        <div id="streams">
+            <div class="stream-container" id="stream-0">
+                <div class="stream-video"></div>
+                <div class="stream-overlay">
+                    <div class="stream-label"></div>
+                    <div class="stream-status">
+                        <span class="status-icon">⏳</span>
+                    </div>
+                </div>
+                <div class="audio-meter"><div class="audio-meter-fill"></div></div>
+                <div class="cry-indicator">🔊 Sound Detected</div>
+            </div>
+            <div class="stream-container" id="stream-1">
+                <div class="stream-video"></div>
+                <div class="stream-overlay">
+                    <div class="stream-label"></div>
+                    <div class="stream-status">
+                        <span class="status-icon">⏳</span>
+                    </div>
+                </div>
+                <div class="audio-meter"><div class="audio-meter-fill"></div></div>
+                <div class="cry-indicator">🔊 Sound Detected</div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <div class="toolbar-left">
+                <select id="stream-select-0" class="stream-select" aria-label="Left stream"></select>
+                <select id="stream-select-1" class="stream-select" aria-label="Right stream"></select>
+            </div>
+            <div class="toolbar-center">
+                <button id="mode-btn" class="toolbar-btn" title="View mode">
+                    <span class="mode-icon">◫</span>
+                    <span class="mode-label">Split</span>
+                </button>
+                <button id="audio-btn" class="toolbar-btn" title="Audio mode">
+                    <span class="audio-icon">🔊</span>
+                    <span class="audio-label">Auto</span>
+                </button>
+            </div>
+            <div class="toolbar-right">
+                <button id="settings-btn" class="toolbar-btn" title="Settings">⚙️</button>
+                <button id="fullscreen-btn" class="toolbar-btn" title="Fullscreen">⛶</button>
+            </div>
+        </div>
+
+        <!-- Settings panel -->
+        <div id="settings-panel" class="hidden">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <button id="settings-close" class="toolbar-btn">✕</button>
+                </div>
+                <div class="settings-group">
+                    <label for="go2rtc-url">go2rtc URL</label>
+                    <input type="text" id="go2rtc-url" placeholder="wss://go2rtc.example.com">
+                    <small>WebSocket API endpoint. Auto-detected from current domain.</small>
+                </div>
+                <div class="settings-group">
+                    <label for="cry-sensitivity">Cry Detection Sensitivity</label>
+                    <input type="range" id="cry-sensitivity" min="1.5" max="5" step="0.1" value="2.5">
+                    <small>Ratio above baseline to trigger alert. Lower = more sensitive.</small>
+                </div>
+                <div class="settings-group">
+                    <label for="calm-timeout">Calm Return Timeout (seconds)</label>
+                    <input type="range" id="calm-timeout" min="10" max="120" step="5" value="30">
+                    <small>How long to wait after sound stops before returning to normal view.</small>
+                </div>
+                <div class="settings-group">
+                    <label for="baseline-time">Baseline Adaptation (seconds)</label>
+                    <input type="range" id="baseline-time" min="30" max="300" step="10" value="120">
+                    <small>Time for audio baseline to adapt (handles white noise machines).</small>
+                </div>
+                <div class="settings-group">
+                    <label>Audio Debug</label>
+                    <div class="debug-meters">
+                        <div class="debug-meter">
+                            <span class="debug-label" id="debug-label-0">Stream 1</span>
+                            <div class="debug-bar"><div class="debug-bar-fill" id="debug-rms-0"></div></div>
+                            <span class="debug-value" id="debug-value-0">0.00</span>
+                            <span class="debug-baseline" id="debug-baseline-0">base: 0.00</span>
+                        </div>
+                        <div class="debug-meter">
+                            <span class="debug-label" id="debug-label-1">Stream 1</span>
+                            <div class="debug-bar"><div class="debug-bar-fill" id="debug-rms-1"></div></div>
+                            <span class="debug-value" id="debug-value-1">0.00</span>
+                            <span class="debug-baseline" id="debug-baseline-1">base: 0.00</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="settings-save" class="settings-save-btn">Save & Reconnect</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/app.js"></script>
+</body>
+</html>
