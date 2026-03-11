@@ -30,22 +30,20 @@
                 <div class="stream-video"></div>
                 <div class="stream-overlay">
                     <div class="stream-label"></div>
-                    <div class="stream-status">
-                        <span class="status-icon">⏳</span>
-                    </div>
                 </div>
+                <div class="live-dot" title="Stream status"></div>
                 <div class="audio-meter"><div class="audio-meter-fill"></div></div>
+                <div class="crop-hint">Drag to pan · Pinch to zoom</div>
                 <div class="cry-indicator">🔊 Sound Detected</div>
             </div>
             <div class="stream-container" id="stream-1">
                 <div class="stream-video"></div>
                 <div class="stream-overlay">
                     <div class="stream-label"></div>
-                    <div class="stream-status">
-                        <span class="status-icon">⏳</span>
-                    </div>
                 </div>
+                <div class="live-dot" title="Stream status"></div>
                 <div class="audio-meter"><div class="audio-meter-fill"></div></div>
+                <div class="crop-hint">Drag to pan · Pinch to zoom</div>
                 <div class="cry-indicator">🔊 Sound Detected</div>
             </div>
         </div>
@@ -61,6 +59,7 @@
                     <span class="mode-icon">◫</span>
                     <span class="mode-label">Split</span>
                 </button>
+                <button id="crop-btn" class="toolbar-btn" title="Adjust crop position">✂️ Crop</button>
                 <button id="audio-btn" class="toolbar-btn" title="Audio mode">
                     <span class="audio-icon">🔊</span>
                     <span class="audio-label">Auto</span>
@@ -81,8 +80,8 @@
                 </div>
                 <div class="settings-group">
                     <label for="go2rtc-url">go2rtc URL</label>
-                    <input type="text" id="go2rtc-url" placeholder="wss://go2rtc.example.com">
-                    <small>WebSocket API endpoint. Auto-detected from current domain.</small>
+                    <input type="text" id="go2rtc-url" placeholder="wss://localhost:8080 or wss://go2rtc.example.com">
+                    <small>WebSocket API endpoint. Default: same-origin (proxied via envoy). Override for local dev.</small>
                 </div>
                 <div class="settings-group">
                     <label for="cry-sensitivity">Cry Detection Sensitivity</label>

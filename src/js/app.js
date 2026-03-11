@@ -17,7 +17,7 @@ const STALE_FRAME_THRESHOLD = 15000;// ms with no new frame → reconnect
 const FORCE_RECONNECT_MS = 2 * 60 * 60 * 1000; // 2 hours
 const RECONNECT_BASE_DELAY = 2000;
 const RECONNECT_MAX_DELAY = 30000;
-const TOOLBAR_HIDE_DELAY = 4000;
+
 const SUSTAIN_TIME = 1500;          // ms of elevated audio to confirm cry
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -27,9 +27,41 @@ function formatStreamName(name) {
 }
 
 function getDefaultGo2rtcUrl() {
-    const domain = location.hostname.replace(/^[^.]+\./, '');
+    // Same-origin: go2rtc API is proxied through envoy on /api/*
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//go2rtc.${domain}`;
+    return `${proto}//${location.host}`;
+}
+
+// Normalize a go2rtc URL from user input. Accepts:
+//   "go2rtc.example.com"         → "wss://go2rtc.example.com"
+//   "wss://go2rtc.example.com"   → as-is
+//   "ws://go2rtc.example.com"    → as-is
+//   "https://go2rtc.example.com" → "wss://go2rtc.example.com"
+//   "http://go2rtc.example.com"  → "ws://go2rtc.example.com"
+function normalizeGo2rtcUrl(input) {
+    input = input.trim();
+    if (input.startsWith('wss://') || input.startsWith('ws://')) return input;
+    if (input.startsWith('https://')) return input.replace('https://', 'wss://');
+    if (input.startsWith('http://')) return input.replace('http://', 'ws://');
+    // Bare hostname — default to wss://
+    return `wss://${input}`;
+}
+
+// Derive the HTTP(S) base URL from a ws(s):// URL for REST API calls
+function wsToHttpUrl(wsUrl) {
+    return wsUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+}
+
+// ─── Crop Positions (per stream name) ────────────────────────────────────────
+
+function loadCropPositions() {
+    try {
+        return JSON.parse(localStorage.getItem('camera-view-crops')) || {};
+    } catch { return {}; }
+}
+
+function saveCropPositions(positions) {
+    localStorage.setItem('camera-view-crops', JSON.stringify(positions));
 }
 
 function loadSettings() {
@@ -78,7 +110,19 @@ class CameraStream {
         this.video.playsInline = true;
         this.video.autoplay = true;
         this.video.muted = true;
+        this.video.controls = false;
+        this.video.disablePictureInPicture = true;
         this.video.style.cssText = 'display:block;width:100%;height:100%;object-fit:contain;background:#000;';
+
+        // Prevent browser's native double-click fullscreen
+        this.video.addEventListener('dblclick', e => e.preventDefault());
+        // Prevent long-press context menu on iPadOS
+        this.video.addEventListener('contextmenu', e => e.preventDefault());
+        // Block native fullscreen entry (Safari/iPadOS)
+        this.video.addEventListener('webkitbeginfullscreen', e => e.preventDefault());
+        // Override the method entirely so nothing can trigger it
+        this.video.webkitEnterFullscreen = () => {};
+        this.video.requestFullscreen = () => Promise.reject();
     }
 
     _setState(s) {
@@ -102,9 +146,8 @@ class CameraStream {
     _doConnect() {
         this._setState('connecting');
 
-        const wsProto = this.go2rtcUrl.startsWith('wss:') ? 'wss:' : 'ws:';
-        const host = this.go2rtcUrl.replace(/^wss?:\/\//, '');
-        const wsUrl = `${wsProto}//${host}/api/ws?src=${encodeURIComponent(this.streamName)}`;
+        const baseUrl = this.go2rtcUrl.replace(/\/+$/, '');
+        const wsUrl = `${baseUrl}/api/ws?src=${encodeURIComponent(this.streamName)}`;
 
         try {
             this.ws = new WebSocket(wsUrl);
@@ -515,7 +558,8 @@ class App {
         this.activeAudioStream = 0;
         this.alertStream = -1;              // which stream triggered alert (-1 = none)
         this.preAlertMode = 'split';        // mode to return to after alert
-        this.toolbarTimer = null;
+        this.cropMode = false;
+        this.cropPositions = loadCropPositions(); // { streamName: { x: 50, y: 50 } }
         this.started = false;
 
         // DOM refs
@@ -527,6 +571,7 @@ class App {
             containers: [document.getElementById('stream-0'), document.getElementById('stream-1')],
             selects: [document.getElementById('stream-select-0'), document.getElementById('stream-select-1')],
             modeBtn: document.getElementById('mode-btn'),
+            cropBtn: document.getElementById('crop-btn'),
             audioBtn: document.getElementById('audio-btn'),
             fullscreenBtn: document.getElementById('fullscreen-btn'),
             settingsBtn: document.getElementById('settings-btn'),
@@ -558,7 +603,10 @@ class App {
         // Resolve go2rtc URL
         if (!this.settings.go2rtcUrl) {
             this.settings.go2rtcUrl = getDefaultGo2rtcUrl();
+        } else {
+            this.settings.go2rtcUrl = normalizeGo2rtcUrl(this.settings.go2rtcUrl);
         }
+        saveSettings(this.settings);
 
         // Mount videos
         for (let i = 0; i < 2; i++) {
@@ -587,7 +635,13 @@ class App {
         this._updateModeButton();
         this._updateAudioButton();
         this._populateSettings();
-        this._showToolbar();
+
+        // Apply saved crop positions & init gestures
+        for (let i = 0; i < 2; i++) this._applyCropTransform(i);
+        this._initCropGestures();
+
+        // Start live indicator
+        this._startLiveIndicator();
 
         // Page visibility handling
         document.addEventListener('visibilitychange', () => this._onVisibilityChange());
@@ -597,12 +651,9 @@ class App {
     // ── Stream List ──────────────────────────────────────────────────────────
 
     async _fetchStreamList() {
-        const httpUrl = this.settings.go2rtcUrl
-            .replace(/^ws:/, 'http:')
-            .replace(/^wss:/, 'https:');
-
+        // Always fetch via same-origin proxy (no CORS issues)
         try {
-            const resp = await fetch(`${httpUrl}/api/streams`);
+            const resp = await fetch('/api/streams');
             const data = await resp.json();
             this.streamList = Object.keys(data).sort();
         } catch (e) {
@@ -641,17 +692,17 @@ class App {
         label.textContent = formatStreamName(name);
         const debugLabel = document.getElementById(`debug-label-${index}`);
         if (debugLabel) debugLabel.textContent = formatStreamName(name);
+        this._applyCropTransform(index);
     }
 
     // ── Stream Events ────────────────────────────────────────────────────────
 
     _onStreamState(index, state) {
-        const icon = this.dom.containers[index].querySelector('.status-icon');
-        switch (state) {
-            case 'disconnected': icon.textContent = '⏹'; break;
-            case 'connecting':   icon.textContent = '⏳'; break;
-            case 'connected':    icon.textContent = '🟢'; break;
-        }
+        // Live dot is updated by _updateLiveDots on a timer
+        const dot = this.dom.containers[index].querySelector('.live-dot');
+        if (!dot) return;
+        if (state === 'connecting') dot.className = 'live-dot stale';
+        else if (state === 'disconnected') dot.className = 'live-dot';
     }
 
     _onMediaStream(index, mediaStream) {
@@ -842,31 +893,7 @@ class App {
         }
     }
 
-    // ── Toolbar ──────────────────────────────────────────────────────────────
-
-    _showToolbar() {
-        this.dom.toolbar.classList.remove('hidden-toolbar');
-        document.body.classList.remove('toolbar-hidden');
-        this._resetToolbarTimer();
-    }
-
-    _hideToolbar() {
-        this.dom.toolbar.classList.add('hidden-toolbar');
-        document.body.classList.add('toolbar-hidden');
-    }
-
-    _toggleToolbar() {
-        if (this.dom.toolbar.classList.contains('hidden-toolbar')) {
-            this._showToolbar();
-        } else {
-            this._hideToolbar();
-        }
-    }
-
-    _resetToolbarTimer() {
-        clearTimeout(this.toolbarTimer);
-        this.toolbarTimer = setTimeout(() => this._hideToolbar(), TOOLBAR_HIDE_DELAY);
-    }
+    // ── Toolbar (always visible) ────────────────────────────────────────────
 
     // ── Settings ─────────────────────────────────────────────────────────────
 
@@ -878,7 +905,7 @@ class App {
     }
 
     _saveSettings() {
-        this.settings.go2rtcUrl = this.dom.go2rtcUrlInput.value || getDefaultGo2rtcUrl();
+        this.settings.go2rtcUrl = normalizeGo2rtcUrl(this.dom.go2rtcUrlInput.value || getDefaultGo2rtcUrl());
         this.settings.crySensitivity = parseFloat(this.dom.crySensitivity.value);
         this.settings.calmTimeout = parseInt(this.dom.calmTimeout.value);
         this.settings.baselineTime = parseInt(this.dom.baselineTime.value);
@@ -924,19 +951,181 @@ class App {
         setTimeout(() => this._connectStreams(), 1000);
     }
 
+    // ── Crop Mode (drag-pan + pinch-zoom, saved per stream) ─────────────────
+
+    _toggleCropMode() {
+        this.cropMode = !this.cropMode;
+        this.dom.streamsEl.classList.toggle('crop-mode', this.cropMode);
+        this.dom.cropBtn.classList.toggle('active', this.cropMode);
+    }
+
+    _getCrop(index) {
+        const name = this.settings.streams[index];
+        return this.cropPositions[name] || { zoom: 1, panX: 50, panY: 50 };
+    }
+
+    _setCrop(index, crop) {
+        const name = this.settings.streams[index];
+        this.cropPositions[name] = crop;
+    }
+
+    _applyCropTransform(index) {
+        const crop = this._getCrop(index);
+        const video = this.streams[index].video;
+        video.style.setProperty('--crop-zoom', crop.zoom);
+        video.style.setProperty('--crop-x', `${crop.panX}%`);
+        video.style.setProperty('--crop-y', `${crop.panY}%`);
+    }
+
+    _initCropGestures() {
+        for (let i = 0; i < 2; i++) {
+            const container = this.dom.containers[i];
+            let dragging = false;
+            let startX, startY, startPanX, startPanY;
+            let pinching = false;
+            let initialPinchDist = 0;
+            let initialZoom = 1;
+
+            // ── Single-finger drag (pan) ──
+            container.addEventListener('pointerdown', (e) => {
+                if (!this.cropMode || pinching) return;
+                e.preventDefault();
+                dragging = true;
+                container.classList.add('dragging');
+                container.setPointerCapture(e.pointerId);
+
+                const crop = this._getCrop(i);
+                startX = e.clientX;
+                startY = e.clientY;
+                startPanX = crop.panX;
+                startPanY = crop.panY;
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (!dragging || pinching) return;
+                e.preventDefault();
+
+                const rect = container.getBoundingClientRect();
+                const crop = this._getCrop(i);
+                // Drag right → show more left → panX decreases
+                const sensitivity = 80 / crop.zoom;
+                const dx = ((e.clientX - startX) / rect.width) * -sensitivity;
+                const dy = ((e.clientY - startY) / rect.height) * -sensitivity;
+
+                const newCrop = {
+                    zoom: crop.zoom,
+                    panX: Math.max(0, Math.min(100, startPanX + dx)),
+                    panY: Math.max(0, Math.min(100, startPanY + dy)),
+                };
+                this._setCrop(i, newCrop);
+                this._applyCropTransform(i);
+            });
+
+            const endDrag = () => {
+                if (!dragging) return;
+                dragging = false;
+                container.classList.remove('dragging');
+                saveCropPositions(this.cropPositions);
+            };
+            container.addEventListener('pointerup', endDrag);
+            container.addEventListener('pointercancel', endDrag);
+
+            // ── Pinch zoom (two fingers) ──
+            container.addEventListener('touchstart', (e) => {
+                if (!this.cropMode || e.touches.length !== 2) return;
+                e.preventDefault();
+                pinching = true;
+                dragging = false;
+                initialPinchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialZoom = this._getCrop(i).zoom;
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!pinching || e.touches.length !== 2) return;
+                e.preventDefault();
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scale = dist / initialPinchDist;
+                const crop = this._getCrop(i);
+                crop.zoom = Math.max(1, Math.min(5, initialZoom * scale));
+                this._setCrop(i, crop);
+                this._applyCropTransform(i);
+            }, { passive: false });
+
+            container.addEventListener('touchend', (e) => {
+                if (!pinching) return;
+                if (e.touches.length < 2) {
+                    pinching = false;
+                    saveCropPositions(this.cropPositions);
+                }
+            });
+
+            // ── Mouse wheel zoom (desktop) ──
+            container.addEventListener('wheel', (e) => {
+                if (!this.cropMode) return;
+                e.preventDefault();
+                const crop = this._getCrop(i);
+                const delta = e.deltaY > 0 ? -0.15 : 0.15;
+                crop.zoom = Math.max(1, Math.min(5, crop.zoom + delta));
+                this._setCrop(i, crop);
+                this._applyCropTransform(i);
+                saveCropPositions(this.cropPositions);
+            }, { passive: false });
+        }
+    }
+
+    // ── Live Indicator ───────────────────────────────────────────────────────
+
+    _startLiveIndicator() {
+        this._liveDots = [
+            this.dom.containers[0].querySelector('.live-dot'),
+            this.dom.containers[1].querySelector('.live-dot'),
+        ];
+        this._liveTimer = setInterval(() => this._updateLiveDots(), 2000);
+    }
+
+    _updateLiveDots() {
+        for (let i = 0; i < 2; i++) {
+            const dot = this._liveDots[i];
+            const stream = this.streams[i];
+            if (stream.state === 'disconnected') {
+                dot.className = 'live-dot';
+                continue;
+            }
+            if (stream.state === 'connecting') {
+                dot.className = 'live-dot stale';
+                continue;
+            }
+            const elapsed = Date.now() - stream.lastFrameTime;
+            if (elapsed < 5000) {
+                dot.className = 'live-dot live';
+            } else if (elapsed < 15000) {
+                dot.className = 'live-dot stale';
+            } else {
+                dot.className = 'live-dot dead';
+            }
+        }
+    }
+
     // ── Events ───────────────────────────────────────────────────────────────
 
     _bindEvents() {
         // Start
         this.dom.startBtn.addEventListener('click', () => this.start());
 
-        // Toolbar interaction keeps it visible
-        this.dom.toolbar.addEventListener('pointerdown', () => this._resetToolbarTimer());
-
-        // Tap streams area to toggle toolbar
+        // Tap a stream to force its audio (skip in crop mode)
         this.dom.streamsEl.addEventListener('click', (e) => {
-            if (e.target.closest('.stream-select, .toolbar-btn, #settings-panel')) return;
-            this._toggleToolbar();
+            if (this.cropMode) return;
+            const container = e.target.closest('.stream-container');
+            if (!container) return;
+            const index = container.id === 'stream-0' ? 0 : 1;
+            this.activeAudioStream = index;
+            this._applyAudioRouting();
         });
 
         // Stream selectors
@@ -948,33 +1137,33 @@ class App {
                 this.streams[i].connect(this.settings.go2rtcUrl, name);
                 this._updateStreamLabel(i, name);
                 this._updateModeButton();
-                this._resetToolbarTimer();
             });
         }
 
         // Mode button
         this.dom.modeBtn.addEventListener('click', () => {
             this._cycleViewMode();
-            this._resetToolbarTimer();
+        });
+
+        // Crop button
+        this.dom.cropBtn.addEventListener('click', () => {
+            this._toggleCropMode();
         });
 
         // Audio button
         this.dom.audioBtn.addEventListener('click', () => {
             this._cycleAudioMode();
-            this._resetToolbarTimer();
         });
 
         // Fullscreen
         this.dom.fullscreenBtn.addEventListener('click', () => {
             this._toggleFullscreen();
-            this._resetToolbarTimer();
         });
 
         // Settings
         this.dom.settingsBtn.addEventListener('click', () => {
             this.dom.settingsPanel.classList.toggle('hidden');
             this._populateSettings();
-            this._resetToolbarTimer();
         });
         this.dom.settingsClose.addEventListener('click', () => {
             this.dom.settingsPanel.classList.add('hidden');
@@ -1008,4 +1197,10 @@ class App {
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
-const app = new App();
+// ?reset in URL clears all settings and reloads clean
+if (location.search.includes('reset')) {
+    localStorage.removeItem('camera-view-settings');
+    location.replace(location.pathname);
+} else {
+    const app = new App();
+}
