@@ -6,10 +6,11 @@ html, body {
     overflow: hidden;
     background: #000;
     color: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
     -webkit-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
 }
 
 .hidden { display: none !important; }
@@ -24,36 +25,50 @@ html, body {
 .start-content { text-align: center; }
 
 .start-icon {
-    font-size: 64px;
-    margin-bottom: 16px;
-    animation: pulse 2s ease-in-out infinite;
+    font-size: 56px;
+    margin-bottom: 12px;
+    opacity: 0.9;
 }
 
 .start-title {
-    font-size: 24px;
-    font-weight: 600;
-    margin-bottom: 32px;
-    opacity: 0.8;
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+.start-subtitle {
+    font-size: 13px;
+    font-weight: 400;
+    opacity: 0.35;
+    margin-bottom: 40px;
 }
 
 #start-btn {
-    padding: 16px 48px;
-    font-size: 18px;
-    font-weight: 600;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 12px;
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+    padding: 14px 56px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 100px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.9);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+}
+
+#start-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.25);
 }
 
 #start-btn:active {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.14);
     transform: scale(0.97);
 }
 
-/* ── Streams Layout ──────────────────────────────── */
+/* ── App Layout ──────────────────────────────────── */
 #app {
     position: fixed; inset: 0;
     display: flex;
@@ -63,20 +78,20 @@ html, body {
 #streams {
     flex: 1;
     display: grid;
-    gap: 2px;
-    background: #000;
+    gap: 1px;
+    background: #111;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    min-height: 0; /* prevent grid blowout */
+    min-height: 0;
 }
 
-/* Split mode: side by side */
+/* Split mode */
 #streams.mode-split {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr;
 }
 
-/* Single mode: one stream fills */
+/* Single mode */
 #streams.mode-single {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
@@ -86,7 +101,7 @@ html, body {
     display: none;
 }
 
-/* Alert mode: crying stream fills, other becomes PiP */
+/* Alert mode */
 #streams.mode-alert {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
@@ -95,13 +110,13 @@ html, body {
 
 #streams.mode-alert .stream-container.alert-pip {
     position: absolute;
-    bottom: 60px; right: 16px;
-    width: 200px; height: 150px;
-    border-radius: 12px;
+    bottom: 16px; right: 16px;
+    width: 220px; height: 165px;
+    border-radius: 10px;
     overflow: hidden;
     z-index: 10;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
-    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.12);
 }
 
 #streams.mode-alert .stream-container.alert-main {
@@ -132,10 +147,6 @@ html, body {
     object-position: center;
     background: #000;
     pointer-events: none;
-}
-
-/* Crop zoom+pan via CSS custom properties */
-.stream-container video {
     transform-origin: var(--crop-x, 50%) var(--crop-y, 50%);
     transform: scale(var(--crop-zoom, 1));
 }
@@ -143,84 +154,85 @@ html, body {
 .stream-container video::-webkit-media-controls { display: none !important; }
 
 .stream-container.audio-active {
-    outline: 2px solid #00d4ff;
+    outline: 2px solid rgba(0, 212, 255, 0.7);
     outline-offset: -2px;
 }
 
 .stream-container.alert-active {
-    outline: 3px solid #ff4444;
-    outline-offset: -3px;
+    outline: 2px solid rgba(255, 68, 68, 0.8);
+    outline-offset: -2px;
     animation: alert-pulse 1.5s ease-in-out infinite;
 }
 
-/* ── Stream Overlay (label) ──────────────────────── */
+/* ── Stream Overlay ──────────────────────────────── */
 .stream-overlay {
     position: absolute; top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 12px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 10px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%);
     pointer-events: none;
     z-index: 5;
 }
 
 .stream-label {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: capitalize;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
 }
 
 /* ── Live Indicator Dot ──────────────────────────── */
 .live-dot {
     position: absolute;
-    top: 10px; right: 10px;
-    width: 12px; height: 12px;
+    top: 12px; right: 12px;
+    width: 8px; height: 8px;
     border-radius: 50%;
-    background: #666;
-    border: 2px solid rgba(0,0,0,0.4);
+    background: #444;
     z-index: 6;
     pointer-events: none;
-    transition: background-color 0.5s;
+    transition: all 0.5s ease;
 }
 
 .live-dot.live {
-    background: #00dd00;
-    box-shadow: 0 0 6px rgba(0, 221, 0, 0.6);
-    animation: dot-pulse 2s ease-in-out infinite;
+    background: #34d058;
+    box-shadow: 0 0 8px rgba(52, 208, 88, 0.5);
 }
 
 .live-dot.stale {
-    background: #ffaa00;
-    box-shadow: 0 0 6px rgba(255, 170, 0, 0.6);
+    background: #f0a030;
+    box-shadow: 0 0 8px rgba(240, 160, 48, 0.5);
 }
 
 .live-dot.dead {
-    background: #ff3333;
-    box-shadow: 0 0 6px rgba(255, 51, 51, 0.6);
-    animation: dot-pulse 0.8s ease-in-out infinite;
+    background: #e03030;
+    box-shadow: 0 0 8px rgba(224, 48, 48, 0.5);
+    animation: dot-pulse 1s ease-in-out infinite;
 }
 
 @keyframes dot-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    50% { opacity: 0.3; }
 }
 
 /* ── Audio Level Meter ───────────────────────────── */
 .audio-meter {
     position: absolute; bottom: 0; left: 0; right: 0;
-    height: 3px;
-    background: rgba(255,255,255,0.1);
+    height: 2px;
+    background: transparent;
+    z-index: 5;
 }
 
 .audio-meter-fill {
     height: 100%;
     width: 0%;
-    background: #00d4ff;
+    background: rgba(0, 212, 255, 0.6);
     transition: width 0.15s ease-out, background-color 0.3s;
 }
 
 .audio-meter-fill.loud {
-    background: #ff4444;
+    background: rgba(255, 68, 68, 0.8);
 }
 
 /* ── Cry Indicator ───────────────────────────────── */
@@ -230,12 +242,14 @@ html, body {
     transform: translate(-50%, -50%);
     padding: 8px 20px;
     background: rgba(255, 68, 68, 0.85);
-    border-radius: 24px;
-    font-size: 14px;
+    border-radius: 100px;
+    font-size: 13px;
     font-weight: 600;
+    letter-spacing: 0.01em;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
+    z-index: 8;
 }
 
 .stream-container.alert-active .cry-indicator {
@@ -247,178 +261,67 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px;
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-    background: rgba(20, 20, 20, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 12px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    background: #0d0d0d;
+    border-top: 1px solid rgba(255,255,255,0.06);
     z-index: 50;
-    transition: transform 0.3s ease, opacity 0.3s ease;
 }
-
-/* Toolbar is always visible — never hide it */
 
 .toolbar-left, .toolbar-center, .toolbar-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .stream-select {
-    padding: 6px 10px;
-    font-size: 13px;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.8);
     outline: none;
-    max-width: 140px;
+    max-width: 120px;
     -webkit-appearance: none;
 }
 
-.stream-select option { background: #222; color: #fff; }
+.stream-select option { background: #1a1a1a; color: #fff; }
 
 .toolbar-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    font-size: 14px;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+    gap: 5px;
+    padding: 5px 10px;
+    font-size: 13px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.7);
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.2s;
+    transition: all 0.15s ease;
 }
 
-.toolbar-btn:active { background: rgba(255,255,255,0.2); }
-
-.mode-label, .audio-label { font-size: 12px; }
-
-/* ── Settings Panel ──────────────────────────────── */
-#settings-panel {
-    position: fixed; inset: 0; z-index: 200;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.settings-content {
-    width: min(460px, 90vw);
-    max-height: 85vh;
-    overflow-y: auto;
-    padding: 24px;
-    background: #1a1a1a;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-.settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.settings-header h2 { font-size: 20px; font-weight: 600; }
-
-.settings-group {
-    margin-bottom: 20px;
-}
-
-.settings-group label {
-    display: block;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 6px;
-}
-
-.settings-group input[type="text"] {
-    width: 100%;
-    padding: 10px 12px;
-    font-size: 14px;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
+.toolbar-btn:hover {
     background: rgba(255,255,255,0.08);
-    color: #fff;
-    outline: none;
+    color: rgba(255,255,255,0.9);
 }
 
-.settings-group input[type="text"]:focus {
-    border-color: #00d4ff;
+.toolbar-btn:active {
+    background: rgba(255,255,255,0.12);
 }
 
-.settings-group input[type="range"] {
-    width: 100%;
-    accent-color: #00d4ff;
+.mode-label, .audio-label {
+    font-size: 11px;
+    font-weight: 500;
 }
-
-.settings-group small {
-    display: block;
-    margin-top: 4px;
-    font-size: 12px;
-    opacity: 0.5;
-}
-
-.settings-save-btn {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    border: none;
-    border-radius: 10px;
-    background: #00d4ff;
-    color: #000;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
-
-.settings-save-btn:active { opacity: 0.8; }
-
-/* ── Debug Meters ────────────────────────────────── */
-.debug-meters {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.debug-meter {
-    display: grid;
-    grid-template-columns: 80px 1fr 50px 80px;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-}
-
-.debug-label { opacity: 0.7; }
-
-.debug-bar {
-    height: 8px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.debug-bar-fill {
-    height: 100%;
-    width: 0%;
-    background: #00d4ff;
-    border-radius: 4px;
-    transition: width 0.15s ease-out;
-}
-
-.debug-value { font-family: monospace; opacity: 0.8; text-align: right; }
-.debug-baseline { font-family: monospace; opacity: 0.5; }
 
 /* ── Crop Mode ───────────────────────────────────── */
 .crop-mode .stream-container {
     cursor: grab;
-    outline: 2px dashed rgba(255, 200, 0, 0.6);
+    outline: 2px dashed rgba(255, 200, 0, 0.5) !important;
     outline-offset: -2px;
 }
 
@@ -430,10 +333,13 @@ html, body {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    padding: 8px 16px;
-    background: rgba(0, 0, 0, 0.75);
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 6px 14px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 200, 0, 0.3);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.7);
     pointer-events: none;
     z-index: 10;
     white-space: nowrap;
@@ -444,19 +350,149 @@ html, body {
 .crop-mode .stream-container.dragging .crop-hint { display: none; }
 
 #crop-btn.active {
-    background: rgba(255, 200, 0, 0.3);
-    border-color: rgba(255, 200, 0, 0.6);
+    background: rgba(255, 200, 0, 0.15);
+    border-color: rgba(255, 200, 0, 0.4);
+    color: rgba(255, 200, 0, 0.9);
+}
+
+/* ── Settings Panel ──────────────────────────────── */
+#settings-panel {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.settings-content {
+    width: min(440px, 90vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px;
+    background: #141414;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.settings-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.settings-group {
+    margin-bottom: 20px;
+}
+
+.settings-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 6px;
+}
+
+.settings-group input[type="text"] {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: "SF Mono", "Menlo", monospace;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.settings-group input[type="text"]:focus {
+    border-color: rgba(0, 212, 255, 0.5);
+}
+
+.settings-group input[type="range"] {
+    width: 100%;
+    accent-color: #00d4ff;
+}
+
+.settings-group small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+}
+
+.settings-save-btn {
+    width: 100%;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    background: #00d4ff;
+    color: #000;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.settings-save-btn:hover { opacity: 0.9; }
+.settings-save-btn:active { opacity: 0.75; }
+
+/* ── Debug Meters ────────────────────────────────── */
+.debug-meters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.debug-meter {
+    display: grid;
+    grid-template-columns: 70px 1fr 44px 72px;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.debug-label { color: rgba(255,255,255,0.5); }
+
+.debug-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.debug-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: #00d4ff;
+    border-radius: 3px;
+    transition: width 0.15s ease-out;
+}
+
+.debug-value {
+    font-family: "SF Mono", monospace;
+    color: rgba(255,255,255,0.6);
+    text-align: right;
+}
+
+.debug-baseline {
+    font-family: "SF Mono", monospace;
+    color: rgba(255,255,255,0.3);
 }
 
 /* ── Animations ──────────────────────────────────── */
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
 @keyframes alert-pulse {
-    0%, 100% { outline-color: #ff4444; }
-    50% { outline-color: #ff8888; }
+    0%, 100% { outline-color: rgba(255, 68, 68, 0.8); }
+    50% { outline-color: rgba(255, 68, 68, 0.3); }
 }
 
 /* ── Portrait orientation ────────────────────────── */
@@ -468,7 +504,7 @@ html, body {
 
     #streams.mode-alert .stream-container.alert-pip {
         bottom: auto; top: 16px; right: 16px;
-        width: 160px; height: 120px;
+        width: 180px; height: 135px;
     }
 }
 
